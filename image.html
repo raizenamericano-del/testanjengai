@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Image Lab — NEURAL AI STUDIO</title>
+<meta name="theme-color" content="#05070d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="mask-icon" href="assets/icon.svg" color="#22d3ee">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+  .lab{display:grid;grid-template-columns:352px minmax(0,1fr);gap:16px;align-items:start}
+  @media(max-width:1080px){.lab{grid-template-columns:1fr}}
+  #preview{background:
+     repeating-conic-gradient(color-mix(in srgb,var(--panel2) 80%,#000) 0 25%,transparent 0 50%) 50%/22px 22px;
+     border:1px solid var(--line);border-radius:var(--r);min-height:320px;display:grid;place-items:center;overflow:hidden;position:relative}
+  #preview canvas{max-height:70vh;width:auto;margin:auto;display:block;border-radius:6px}
+  .opbtn{width:100%;justify-content:flex-start}
+  .rowlab{display:grid;grid-template-columns:1fr 56px;gap:8px;align-items:center}
+  .num{font-family:var(--mono);font-size:.76rem;color:var(--dim);text-align:right}
+  #brush{cursor:crosshair}
+  .gal .del{background:rgba(0,0,0,.6);border-radius:6px;padding:1px 5px;cursor:pointer}
+</style>
+</head>
+<body class="app">
+<script src="secrets.local.js"></script>
+<script src="assets/js/lib/config.js"></script>
+<script src="assets/js/lib/ui.js"></script>
+<script src="assets/js/lib/store.js"></script>
+<script src="assets/js/lib/auth.js"></script>
+<script src="assets/js/lib/img.js"></script>
+<script src="assets/js/lib/ai.js"></script>
+<script src="assets/js/lib/tools.js"></script>
+<script src="assets/js/app-image.js"></script>
+<script src="assets/js/lib/pwa.js"></script>
+</body>
+</html>

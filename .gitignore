@@ -1,0 +1,27 @@
+# secrets — jangan pernah di-commit (GitHub push protection bakal nge-block anyway)
+secrets.local.js
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+
+# deps / build
+node_modules/
+dist/
+build/
+.next/
+out/
+.cache/
+*.log
+npm-debug.log*
+.DS_Store
+
+# test artifacts
+*.zip
+coverage/
+
+# browser setup buat e2e (sandbox-only, bukan bagian app)
+node_modules/
+test/.browsersys/

@@ -1,0 +1,256 @@
+// NEURAL AI STUDIO — Prisma schema (PostgreSQL).
+// 1:1 with assets/js/lib/store.js so the client swap is mechanical:
+//   coll('threads') ↔ Thread   ·   coll('images') ↔ Image   ·   coll('activity') ↔ Event
+// run: npx prisma migrate dev --name init && npx prisma db seed
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  relationMode = "prisma"          // set to "foreignKeys" once RDS/Neon is real
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+enum Tier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum KeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  bio           String?
+  role          Role      @default(USER)
+  tier          Tier      @default(FREE)
+  passwordHash  String?              // null for OAuth-only accounts
+  stripeId      String?
+  currentPeriodEnd DateTime?
+  banned        Boolean   @default(false)
+  quotaOverride Int?                 // admin can grant extra requests
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastLoginAt   DateTime?
+
+  identities    Identity[]
+  sessions      Session[]
+  threads       Thread[]
+  images        Image[]
+  apiKeys       ApiKey[]
+  events        Event[]
+  generations   Generation[]
+  downloads     Download[]
+  shortLinks    ShortLink[]
+
+  @@index([tier, createdAt])
+  @@index([email])
+}
+
+// NextAuth adapters
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Identity {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider String
+  extra  Json?
+  @@unique([userId, provider])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+  ipHash       String?
+  ua           String?  @db.Text
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model Thread {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String    @default("Chat baru")
+  provider  String    @default("groq")
+  model     String
+  system    String?   @db.Text
+  pinned    Boolean   @default(false)
+  archived  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  threadId  String
+  thread    Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role      String                    // user | assistant | system
+  content   String   @db.Text
+  model     String?
+  tokensIn  Int?
+  tokensOut Int?
+  costUsd   Decimal? @db.Decimal(10, 6)
+  images    Json?                      // [{ url, prompt }]
+  files     Json?                      // [{ name, mime, bytes, extractStatus }]
+  flagged   Boolean  @default(false)   // moderation queue
+  createdAt DateTime @default(now())
+
+  @@index([threadId, createdAt])
+  @@index([flagged, createdAt])
+}
+
+// generated images are files on object storage; DB keeps metadata only
+model Image {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt     String   @db.Text
+  negative   String?
+  style      String?
+  aspect     String?
+  model      String
+  key        String?                    // storage key, e.g. images/2026/09/ulid.png
+  url        String   @db.Text
+  bytes      Int?
+  width      Int?
+  height     Int?
+  source     String   @default("lab")   // lab | chat | upscale | inpaint
+  removedAt  DateTime?                  // soft delete so gallery.zip stays reproducible
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([prompt(ops: raw("gin_trgm_ops"))], type: Gin)   // needs pg_trgm
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label      String    @default("default")
+  prefix     String                      // first 12 chars, for display/lookup
+  keyHash    String    @unique            // sha256, never the key itself
+  status     KeyStatus @default(ACTIVE)
+  ratePerMin Int       @default(60)
+  dayLimit   Int?
+  scopes     String[]  @default(["chat", "image", "tools"])
+  lastUsedAt DateTime?
+  calls      Int       @default(0)
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  @@index([userId, status])
+}
+
+// one row per billable call — this is what "quota" actually means
+model Generation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String                       // chat | image | stt | tts | search | tool
+  model     String?
+  prompt    String   @db.Text
+  status    String                       // ok | error | refused
+  ms        Int?
+  tokensIn  Int?
+  tokensOut Int?
+  costUsd   Decimal? @db.Decimal(10, 6)
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([kind, createdAt])
+}
+
+model Download {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform  String                       // tiktok | youtube | …
+  url       String   @db.Text
+  canonical String   @db.Text
+  mediaKind String?                      // video | audio | image
+  status    String                       // resolved | blocked | failed | user-owned
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([platform, status])
+}
+
+model Event {
+  id     String   @id @default(cuid())
+  userId String?
+  user   User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  kind   String
+  detail String   @db.Text
+  meta   Json?
+  at     DateTime @default(now())
+
+  @@index([userId, at])
+  @@index([kind, at])
+}
+
+model ShortLink {
+  id       String   @id @default(cuid())
+  code     String   @unique
+  url      String   @db.Text
+  userId   String?
+  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hits     Int      @default(0)
+  note     String?
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([code])
+}
+
+// Redis is cache + rate limit only; these tables are the source of truth.
+// Suggested keys:
+//   nas:quota:{userId}:{yyyy-mm-dd}   INCR + EXPIRE at midnight UTC
+//   nas:rl:{ip}:{route}                sliding window
+//   nas:cache:{sha1(url)}              fetch/meta/oembed results, TTL 300s
+//   nas:sse:{streamId}                 pub/sub for chat streaming fan-out + Socket.io "stats"

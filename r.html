@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Redirect — NEURAL AI STUDIO</title>
+<link rel="stylesheet" href="assets/css/app.css">
+</head>
+<body class="app" style="display:grid;place-items:center;min-height:100vh">
+<div class="wrap" style="max-width:520px">
+  <div class="card col" id="card">
+    <span class="tag">⌁ short link</span>
+    <h2 id="t" style="margin:4px 0">mencari…</h2>
+    <p class="dim small" id="d"></p>
+    <div class="row" id="a"></div>
+  </div>
+</div>
+<script src="secrets.local.js"></script>
+<script src="assets/js/lib/config.js"></script>
+<script src="assets/js/lib/ui.js"></script>
+<script src="assets/js/lib/store.js"></script>
+<script src="assets/js/lib/auth.js"></script>
+<script src="assets/js/lib/tools.js"></script>
+<script>
+(function () {
+  const n = window.NAS;
+  document.documentElement.dataset.theme = n.store.settings.get().theme;
+  const code = new URLSearchParams(location.search).get('to') || location.hash.replace(/^#/, '');
+  const t = document.getElementById('t'), d = document.getElementById('d'), a = document.getElementById('a');
+  if (!code) { t.textContent = 'kode hilang'; d.textContent = 'Format: r.html?to=<kode>'; return; }
+  const s = n.tools.resolveShort(code);
+  if (!s) {
+    t.textContent = 'kode "' + code + '" tidak ada di device ini';
+    d.textContent = 'Shortener build ini lokal (localStorage) — link cuma jalan di browser tempat ia dibuat. Versi Next.js menyimpannya di tabel Link + Redis cache supaya bisa dipakai publik.';
+    a.appendChild(n.h('a.btn', { href: 'tools.html', text: '← bikin link baru' }));
+    return;
+  }
+  t.innerHTML = '→ <a href="' + n.esc(s.url) + '" rel="noopener noreferrer" target="_blank">' + n.esc(s.url) + '</a>';
+  d.textContent = 'dibuat ' + new Date(s.createdAt).toLocaleString('id-ID') + ' · redirect otomatis dalam 3 detik · ' + s.hits + ' klik total';
+  a.append(n.h('button.btn.sm.pri', { text: 'lanjut sekarang', onclick: () => location.href = s.url }), n.h('button.btn.sm.gho', { text: 'batal', onclick: () => location.href = 'tools.html' }));
+  setTimeout(() => { if (document.visibilityState === 'visible') location.href = s.url; }, 3000);
+})();
+</script>
+<script src="assets/js/lib/pwa.js"></script>
+</body>
+</html>
